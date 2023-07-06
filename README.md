@@ -190,7 +190,7 @@ void backtrace(void) {
 ![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/result2.png)  
 
 **3. Alarm (hard)**  
-实验的目标：是想教会我们：当用户程序异常、中断时，一种通用的内核中应当实现的处理方式。也就是说真正重要的是**面对应用程序的这种情况，我们应该在内核中有怎样的设计思想去处理**。
+实验的目标：是想教会我们：当用户程序异常、中断时，一种通用的内核中应当实现的处理方式。也就是说真正重要的是**面对应用程序的这种情况，我们应该在内核中有怎样的设计思想去处理**。  
 广泛的设计思想是：当用户程序发生异常、中断时，我们应该像**系统调用**那样，先跑进内核，把用户断点保存，然后执行相应的中断/异常处理程序，处理完后，再从断点恢复。  
 然而，因为异常、中断毕竟和**系统调用**不同，内核里面（**trap.c**）中需要它们自己的实现方式。  
 
@@ -199,3 +199,59 @@ void backtrace(void) {
   
 * **注意，本来这里应该按实验思路是一步一步走的（就是先通过 test0 ，然后再满足 test1、test2 的要求），但是完成之后，中间过程被修改了（因为仅仅满足 test0 还是有bug），我也有些遗忘了，所以这里就直接给出最后的答案，思路会随着代码给出**
 
+（1）在用户空间给出关于系统调用函数的声明、**Makefile**文件的修改，略  
+（2）满足 **test0** 的要求：  
+a. 在 “**sysproc.c/sys_sigalarm(n, fn)**” 中记录当前用户空间传递过来的 “**n和fn**” 参数，很显然，我们可以直接使用下面的方式。因为在 “**trampoline.S**” 中已经将所有的寄存器保存在 **TRAPFRAME** 中。
+而 **TRAPFRAME** 这一页在用户空间的页表中注册过，在**kernel**的页表里面没有，但是在**kernel**中可以使用 “**p->trapframe**” 的方式访问当前进程的 “**TRAPFRAME**”。这是因为虽然 “**p->trapframe**” 和 **TRAPFRAME** 分别在**kernel**页表和用户页表中注册，但实际上却是一个物理内存页。
+参考“proc.c/proc_pagetable”中下面的代码段：
+```
+// map the trapframe just below TRAMPOLINE, for trampoline.S.
+  if(mappages(pagetable, TRAPFRAME, PGSIZE,
+              (uint64)(p->trapframe), PTE_R | PTE_W) < 0){
+    uvmunmap(pagetable, TRAMPOLINE, 1, 0);
+    uvmfree(pagetable, 0);
+    return 0;
+  }
+```
+的确是把“**p->trapframe**”注册到用户页表中“**TRAPFRAME**”的位置。  
+  
+因此，可以在 “**sysproc.c/sys_sigalarm(n, fn)**” 这样去获取两个参数（按照**Calling Convention**应当保存在寄存器**a0**和**a1**中）
+```
+myproc()->interval = myproc()->trapframe->a0;//第一个参数
+myproc()->fn_pos = myproc()->trapframe->a1;//第二个参数
+```
+当然，这里面应当在“**kernel/proc.h**”中增加变量表示上述的“**n和fn**”
+```
+//加入3个新的变量
+int interval; //tick间隔
+int now_interval; //现在走过的时间间隔
+uint64 fn_pos; //handler function的地址(user space)
+```
+  
+同时在“**kernel/proc.c**”的“**allocproc()**”函数中将它们初始化
+```
+//一些初始化部分
+p->interval = 0;
+p->now_interval = 0;
+p->fn_pos = 0;
+```
+
+当时钟中断到来时，我们的处理部分在“**kernel/trap.c/usertrap()**”如下的部分（这里只是为了先达到**test0**的要求，输出“**alarm!**”）：  
+**有个很重要的点是：当在“trap.c/usertrapret()”中执行的时候，会将p->trapframe->epc的值写入到sepc寄存器，而在sret指令执行的时候，sepc寄存器会将值写入到pc寄存器（需要仔细看文献），所以在下面的代码段里面有 p->trapframe->epc = p->fn_pos; 这样一句代码，就把所有的流程都能接上了**
+```
+if(which_dev == 2)
+  {
+    yield();
+    if(p->interval > 0) {
+      if(p->now_interval < p->interval - 1) p->now_interval++;
+      else {
+        p->trapframe->epc = p->fn_pos;
+        p->interval = 0;//这样是否可以保证在handler的过程中不会进来? 
+        p->now_interval = 0; //重新计时
+      }
+    }
+  }
+```
+到这里，应该就可以输出“**alarm!**”了。
+
+（3）修改代码至正确，满足“**test0 test1 test2**”的要求
