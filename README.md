@@ -149,3 +149,13 @@ printf("x=%d y=%d\n", 3);
 下图是 **gdb** 刚进入 “**printf**” 函数时寄存器的情况，可以看到 **a1** 保留了参数3，**a2** 参数为 **5237**，最终的输出也是 “**y=5237**”。
 ![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/a1a2.png)
 ![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/output.png)
+
+**2. Backtrace (moderate)**  
+实验目标：如果内核中有函数发生错误，那么最好能通过调用关系显示调用流程，逐步定位发生错误的点和原因。  
+实验方法：利用内核中函数调用过程中分配的stack，stack会保存调用者（**caller**）的 **frame pointer** ，这样就可以沿着这条线一直走，直到最早的调用者。  
+  
+我们会在 “**kernel/printf.c**” 中实现函数 **backtrace()**，并在 “**sys_sleep**” 中调用 **backtrace()** 追踪函数调用流程中的所有返回地址。  
+本次实验通过 **sys_sleep** 查看上述过程，我们知道 **xv6** 中系统调用的流程如下为： **trap.c/usertrap() -> syscall.c/syscall() -> sysproc.c/sys_*()**,  
+在 **sys_sleep** 中加入 **backtrace()** 后，调用流程和 **frame pointer** 、 **return address** 的指向如图所示：
+
+
