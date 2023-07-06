@@ -147,4 +147,5 @@ printf("x=%d y=%d\n", 3);
 ```
 两个部分主要的差别是上面的的少了给寄存器 **a2** 赋值的指令。如果执行过程没有报错的话，**“y=”** 的输出结果就是进入 “**printf**” 函数时的寄存器 **a2** 的值。
 下图是 **gdb** 刚进入 “**printf**” 函数时寄存器的情况，可以看到 **a1** 保留了参数3，**a2** 参数为 **5237**，最终的输出也是 “**y=5237**”。
-
+![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/a1a2.png)
+![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/output.png)
