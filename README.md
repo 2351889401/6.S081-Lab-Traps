@@ -24,7 +24,7 @@ https://blog.csdn.net/ConstineWhy/article/details/123291723
 
 ### 三、Traps实验  （https://pdos.csail.mit.edu/6.S081/2020/labs/traps.html）
 
-**1. RISC-V assembly (easy)**  
+#### **1. RISC-V assembly (easy)**  
 user/call.c源码
 ```
 int g(int x) {
