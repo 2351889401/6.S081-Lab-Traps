@@ -156,6 +156,37 @@ printf("x=%d y=%d\n", 3);
   
 我们会在 “**kernel/printf.c**” 中实现函数 **backtrace()**，并在 “**sys_sleep**” 中调用 **backtrace()** 追踪函数调用流程中的所有返回地址。  
 本次实验通过 **sys_sleep** 查看上述过程，我们知道 **xv6** 中系统调用的流程如下为： **trap.c/usertrap() -> syscall.c/syscall() -> sysproc.c/sys_*()**,  
-在 **sys_sleep** 中加入 **backtrace()** 后，调用流程和 **frame pointer** 、 **return address** 的指向如图所示：
+在 **sys_sleep** 中加入 **backtrace()** 后，调用流程和 **frame pointer** 、 **return address** 的指向如图所示：  
+![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/frame.png)
+至于为什么到 “**trap.c**” 停止了，因为 “**trap.c**” 是被汇编程序 “**trampoline.S/uservec**” 调用，可能汇编调C不会产生内核栈？（这一点我也不确定）  
+  
+代码主要修改处（这里就忽略细节了）：  
+“**kernel/riscv.h**”
+```
+static inline uint64
+r_fp()
+{
+  uint64 x;
+  asm volatile("mv %0, s0" : "=r" (x) );
+  return x;
+}
+```
+“**kernel/printf.c**”
+```
+void backtrace(void) {
+  uint64 _fp = r_fp(); //当前的frame_pointer在内核中的地址
+  //利用它找到当前的return address 和 前一个stack frame的frame_pointer
+  while(PGROUNDUP(_fp) - PGROUNDDOWN(_fp) == PGSIZE) {
+    uint64* ra_pos = (uint64*)(_fp - 8);
+    uint64 ra = *ra_pos;
+    printf("%p\n", ra);
+    
+    uint64* pre_fp = (uint64*)(_fp - 16);
+    _fp = *pre_fp;
+  }
+}
+```
+得到的结果为：  
+![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/result2.png)  
 
-
+**3. Alarm (hard)**  
