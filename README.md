@@ -24,7 +24,7 @@ https://blog.csdn.net/ConstineWhy/article/details/123291723
 
 ### 三、Traps实验  （https://pdos.csail.mit.edu/6.S081/2020/labs/traps.html）
 
-#### **1. RISC-V assembly (easy)**  
+### **1. RISC-V assembly (easy)**  
 user/call.c源码
 ```
 int g(int x) {
@@ -150,7 +150,7 @@ printf("x=%d y=%d\n", 3);
 ![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/a1a2.png)
 ![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/output.png)
 
-#### **2. Backtrace (moderate)**  
+### **2. Backtrace (moderate)**  
 实验目标：如果内核中有函数发生错误，那么最好能通过调用关系显示调用流程，逐步定位发生错误的点和原因。  
 实验方法：利用内核中函数调用过程中分配的stack，stack会保存调用者（**caller**）的 **frame pointer** ，这样就可以沿着这条线一直走，直到最早的调用者。  
   
@@ -189,8 +189,8 @@ void backtrace(void) {
 得到的结果如下图，能够显示函数调用的流程：  
 ![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/result2.png)  
 
-#### **3. Alarm (hard)**  
-实验的目标：是想教会我们：当用户程序异常、中断时，一种通用的内核中应当实现的处理方式。也就是说真正重要的是**面对应用程序的这种情况，我们应该在内核中有怎样的设计思想去处理**。  
+### **3. Alarm (hard)**  
+实验的目标：是想教会我们：当用户程序异常、中断时，一种通用的、内核中应当实现的处理方式。也就是说真正重要的是**面对应用程序的这种情况，我们应该在内核中有怎样的设计思想去处理**。  
 广泛的设计思想是：当用户程序发生异常、中断时，我们应该像**系统调用**那样，先跑进内核，把用户断点保存，然后执行相应的中断/异常处理程序，处理完后，再从断点恢复。  
 然而，因为异常、中断毕竟和**系统调用**不同，内核里面（**trap.c**）中需要它们自己的实现方式。  
 
