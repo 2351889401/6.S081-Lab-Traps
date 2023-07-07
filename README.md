@@ -273,7 +273,7 @@ extern uint64 sys_sigreturn(void);
 [SYS_sigalarm] sys_sigalarm,
 [SYS_sigreturn] sys_sigreturn,
 ```
-**kernel/proc.h**中的**struct proc**加入一些变量保存进程的“设定的时间间隔、已经走过的时间间隔、中断处理函数的地址、**bool**变量标记当前是否允许**sys_sigalarm**被调用（因为实验要求不允许在**sys_sigalarm**被调用时再次调用**sys_sigalarm**）”：
+**kernel/proc.h**中的**struct proc**加入一些变量保存进程的“设定的时间间隔、已经走过的时间间隔、中断处理函数的地址、**bool**变量标记当前是否允许**sys_sigalarm**被调用（因为实验要求不允许在**sys_sigreturn**被调用之前再次调用**sys_sigalarm**进行一些设置）”：
 ```
 int interval; //tick间隔
 int now_interval; //现在走过的时间间隔
@@ -295,7 +295,7 @@ sys_sigalarm(void) {
     myproc()->interval = myproc()->trapframe->a0;//第一个参数
     myproc()->fn_pos = myproc()->trapframe->a1;//第二个参数
     myproc()->allowed_sigalarm = 1;
-    if(myproc()->interval == 0) myproc()->allowed_sigalarm = 0;//因为在“**alarmtest.c**”中**test0**后紧跟**test1**函数
+    if(myproc()->interval == 0) myproc()->allowed_sigalarm = 0;//因为“sigalarm(0,0)”会导致我们想要的中断处理程序不起作用，此时是允许“不执行sys_sigreturn”直接执行下一次的“sys_sigalarm”的，“alarmtest.c”中的test0后面直接跟test1的调用就是这种情况
   }
   return 0;
 }
@@ -306,3 +306,125 @@ sys_sigreturn(void) {
   return 0;
 }
 ```
+**kernel/trap.c**中是最重要的修改：
+```
+//进入handler处理函数时保存的全部状态 这些全局变量用来保存寄存器状态、当前设置的时钟中断n、用户程序的断点pc值
+struct trapframe* saved_trapframe = 0;
+int saved_interval = 0;
+uint64 saved_pc = 0;
+
+//下面这个函数可能有更简单的写法，当时有点考虑不动了，就偷懒写成这样，但是这样是对的
+void my_copy(struct trapframe* p1, struct trapframe* p2) {
+ p1->ra = p2->ra;
+ p1->sp = p2->sp;
+ p1->gp = p2->gp;
+ p1->tp = p2->tp;
+ p1->t0 = p2->t0;
+ p1->t1 = p2->t1;
+ p1->t2 = p2->t2;
+ p1->s0 = p2->s0;
+ p1->s1 = p2->s1;
+ p1->a0 = p2->a0;
+ p1->a1 = p2->a1;
+ p1->a2 = p2->a2;
+ p1->a3 = p2->a3;
+ p1->a4 = p2->a4;
+ p1->a5 = p2->a5;
+ p1->a6 = p2->a6;
+ p1->a7 = p2->a7;
+ p1->s2 = p2->s2;
+ p1->s3 = p2->s3;
+ p1->s4 = p2->s4;
+ p1->s5 = p2->s5;
+ p1->s6 = p2->s6;
+ p1->s7 = p2->s7;
+ p1->s8 = p2->s8;
+ p1->s9 = p2->s9;
+ p1->s10 = p2->s10;
+ p1->s11 = p2->s11;
+ p1->t3 = p2->t3;
+ p1->t4 = p2->t4;
+ p1->t5 = p2->t5;
+ p1->t6 = p2->t6;
+}
+
+void
+usertrap(void)
+{
+  int which_dev = 0;
+
+  if((r_sstatus() & SSTATUS_SPP) != 0)
+    panic("usertrap: not from user mode");
+
+  // send interrupts and exceptions to kerneltrap(),
+  // since we're now in the kernel.
+  w_stvec((uint64)kernelvec);
+
+  struct proc *p = myproc();
+  
+  // save user program counter.
+  p->trapframe->epc = r_sepc();
+  
+  if(r_scause() == 8){
+    // system call
+
+    if(p->killed)
+      exit(-1);
+
+    // sepc points to the ecall instruction,
+    // but we want to return to the next instruction.
+    p->trapframe->epc += 4;
+
+    // an interrupt will change sstatus &c registers,
+    // so don't enable until done with those registers.
+    intr_on();
+
+    syscall();
+    //如果调用了sigreturn应当让原来的pc和用户寄存器、设置的时钟中断间隔n，都恢复到它们应当所在的位置 这一段写的思路实际上来源于下一个视频 Page-Fault-Exceptions 当时提前看了 就参考老师的写法在这里实现了
+    if(p->trapframe->a7 == 23) {
+      p->interval = saved_interval;
+      p->trapframe->epc = saved_pc;
+      //恢复全部的用户态寄存器
+      my_copy(p->trapframe, saved_trapframe);
+    }
+
+  } else if((which_dev = devintr()) != 0){
+    // ok
+  } else {
+    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    p->killed = 1;
+  }
+
+  if(p->killed)
+    exit(-1);
+
+  // give up the CPU if this is a timer interrupt.
+  if(which_dev == 2)
+  {
+    yield();
+    if(p->interval > 0) {
+      if(p->now_interval < p->interval - 1) p->now_interval++;
+      else {
+        saved_pc = p->trapframe->epc;//保存pc
+        p->trapframe->epc = p->fn_pos;
+
+        saved_interval = p->interval;//保存设置的时钟中断n
+        p->interval = 0;//这样是否可以保证在handler的过程中不会进来?
+        
+        p->now_interval = 0; //重新计时
+
+        if(saved_trapframe == 0) saved_trapframe = (struct trapframe *)kalloc();//这里做的事情是应用程序执行到这一步，只分配一页去保存寄存器状态，否则每次执行到这里都分配一页，可能内存会被不合理的消耗？对于多个进程的情况我这里没有考虑太多，可能在多进程的情况下是有问题的。
+        memset(saved_trapframe, 0, PGSIZE);
+        
+        my_copy(saved_trapframe, p->trapframe);//保存寄存器状态
+      }
+    }
+  }
+    
+
+  usertrapret();
+}
+```
+
+至此，所有的代码都完成了，看下实验结果：  
