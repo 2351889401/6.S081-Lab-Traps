@@ -186,7 +186,7 @@ void backtrace(void) {
   }
 }
 ```
-得到的结果为：  
+得到的结果如下图，能够显示函数调用的流程：  
 ![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/result2.png)  
 
 #### **3. Alarm (hard)**  
