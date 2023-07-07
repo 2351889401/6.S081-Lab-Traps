@@ -256,16 +256,20 @@ if(which_dev == 2)
 
 （3）修改代码至正确，满足“**test0 test1 test2**”的要求  
 上面的过程仅能满足当时钟中断到达**n**的时候，内核可以安排中断处理程序**fn**的执行，也就是现在可以输出“**alarm!**”。但是执行完中断处理程序后，怎么回退到应用程序被中断之前的状态，还没有给出方案。  
+  
 实验要求给出的解决方案是：利用**sys_sigreturn**系统调用，它在中断处理程序的最后被调用，完成被中断的应用程序恢复执行现场（恢复数据寄存器、**pc**）的作用。  
+  
 所以，这一步的核心是要做好**sys_sigreturn**的内容，以及它被调用完成后的一些操作（这是因为我们写的系统调用函数通常放在“**kernel/sysproc.c**”中，而被中断时的数据保存在“**kernel/trap.c**”中，我们可以在完成系统调用后，在“**kernel/trap.c**”中去写好后续的中断恢复情况）。  
+  
 我们在这里直接按顺序给出所有修改的代码，这样能更加清晰看到需要修改的地方（是在步骤（2）的基础上的完整描述）：  
-* **也可以直接参考本仓库中kernel文件夹下的源码**  
-**kernel/syscall.h**中加入2个系统调用编号说明：
+* **也可以直接参考本仓库中kernel文件夹下的源码**
+
+“**kernel/syscall.h**”中加入2个系统调用编号说明：
 ```
 #define SYS_sigalarm 22
 #define SYS_sigreturn 23
 ```
-**kernel/syscall.c**中加入2个系统调用：
+“**kernel/syscall.c**”中加入2个系统调用：
 ```
 extern uint64 sys_sigalarm(void);
 extern uint64 sys_sigreturn(void);
@@ -273,21 +277,21 @@ extern uint64 sys_sigreturn(void);
 [SYS_sigalarm] sys_sigalarm,
 [SYS_sigreturn] sys_sigreturn,
 ```
-**kernel/proc.h**中的**struct proc**加入一些变量保存进程的“设定的时间间隔、已经走过的时间间隔、中断处理函数的地址、**bool**变量标记当前是否允许**sys_sigalarm**被调用（因为实验要求不允许在**sys_sigreturn**被调用之前再次调用**sys_sigalarm**进行一些设置）”：
+“**kernel/proc.h**”中的“**struct proc**”加入一些变量保存进程的“设定的时间间隔、已经走过的时间间隔、中断处理函数的地址、**bool**变量标记当前是否允许**sys_sigalarm**被调用（因为实验要求不允许在**sys_sigreturn**被调用之前再次调用**sys_sigalarm**进行一些设置）”：
 ```
 int interval; //tick间隔
 int now_interval; //现在走过的时间间隔
 uint64 fn_pos; //handler function的地址(user space)
 int allowed_sigalarm; //为0表示允许sigalarm进行系统调用 为1表示不允许
 ```
-**kernel/proc.h**中对加入**struct proc**的新变量初始化：
+“**kernel/proc.h**”中对加入**struct proc**的新变量初始化：
 ```
 p->interval = 0;
 p->now_interval = 0;
 p->fn_pos = 0;
 p->allowed_sigalarm = 0;
 ```
-**kernel/sysproc.c**中实现**sys_sigalarm(n, fn)** 和 **sys_sigreturn()**：
+“**kernel/sysproc.c**”中实现**sys_sigalarm(n, fn)** 和 **sys_sigreturn()**：
 ```
 uint64
 sys_sigalarm(void) {
@@ -306,7 +310,7 @@ sys_sigreturn(void) {
   return 0;
 }
 ```
-**kernel/trap.c**中是最重要的修改：
+“**kernel/trap.c**”中是最重要的修改：
 ```
 //进入handler处理函数时保存的全部状态 这些全局变量用来保存寄存器状态、当前设置的时钟中断n、用户程序的断点pc值
 struct trapframe* saved_trapframe = 0;
