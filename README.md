@@ -428,3 +428,5 @@ usertrap(void)
 ```
 
 至此，所有的代码都完成了，看下实验结果：  
+![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/result3_1.png)
+![](https://github.com/2351889401/6.S081-Lab-Traps/blob/main/images/result3_2.png)
