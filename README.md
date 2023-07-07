@@ -201,7 +201,7 @@ void backtrace(void) {
 
 （1）在用户空间给出关于系统调用函数的声明、**Makefile**文件的修改，略  
 （2）满足 **test0** 的要求：  
-a. 在 “**sysproc.c/sys_sigalarm(n, fn)**” 中记录当前用户空间传递过来的 “**n和fn**” 参数，很显然，我们可以直接使用下面的方式。因为在 “**trampoline.S**” 中已经将所有的寄存器保存在 **TRAPFRAME** 中。
+在 “**sysproc.c/sys_sigalarm(n, fn)**” 中记录当前用户空间传递过来的 “**n和fn**” 参数，很显然，我们可以直接使用下面的方式。因为在 “**trampoline.S**” 中已经将所有的寄存器保存在 **TRAPFRAME** 中。
 而 **TRAPFRAME** 这一页在用户空间的页表中注册过，在**kernel**的页表里面没有，但是在**kernel**中可以使用 “**p->trapframe**” 的方式访问当前进程的 “**TRAPFRAME**”。这是因为虽然 “**p->trapframe**” 和 **TRAPFRAME** 分别在**kernel**页表和用户页表中注册，但实际上却是一个物理内存页。
 参考“proc.c/proc_pagetable”中下面的代码段：
 ```
