@@ -22,7 +22,7 @@ https://blog.csdn.net/ConstineWhy/article/details/123291723
 
 ## 实验之前很重要的一点，一定要耐下心、好好看文档+内核源码（其实看英文文献尤其锻炼咱们的耐心，看不明白的就 **chat-gpt** 帮忙翻译），多思考这么设计的原因和结果，可能会有不一样的感悟。
 
-### 三、Traps实验  （https://pdos.csail.mit.edu/6.S081/2020/labs/traps.html）
+### 三、Traps实验  （https://pdos.csail.mit.edu/6.S081/2020/labs/traps.html ）
 
 ## **1. RISC-V assembly (easy)**  
 user/call.c源码
