@@ -9,7 +9,7 @@
 
 ### 二、关于环境配置和相关包的一些安装
 当时安装的过程挺不容易，这里给出2个核心的参考链接：  
-https://www2014.aspxhtml.com/post-23428/  
+https://www2014.aspxhtml.com/post-23428/ (这一个链接似乎已经失效了，主要的内容是关于gdb的配置的，很抱歉！)  
 https://blog.csdn.net/ConstineWhy/article/details/123291723  
 和一些重要的注意事项：  
   
